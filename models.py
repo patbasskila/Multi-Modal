@@ -1,4 +1,5 @@
 import os
+import re
 from typing import TypedDict, Any, List, Dict
 from langgraph.graph import StateGraph, START, END
 from langchain_core.runnables import RunnableLambda
@@ -85,20 +86,19 @@ def llm_adapter(state: AppState) -> AppState:
     # 2) Call the agent
     llm_out = llm_agent.run(prompt)
 
-    # 3) Extract only the first response block
+    # 3) Extract the first response via regex
     full_text = llm_out["text"]
-    # split off the first Response:
-    if "### Response:" in full_text:
-        # take everything after the first ### Response:
-        resp_block = full_text.split("### Response:", 1)[1]
-        # if there’s a second instruction marker, cut it off there
-        if "### Instruction:" in resp_block:
-            resp_block = resp_block.split("### Instruction:")[0]
-        cleaned = resp_block.strip()
+    match = re.search(
+        r"### Response:\s*([\s\S]*?)(?=### Instruction:|$)",
+        full_text,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        cleaned = match.group(1).strip()
     else:
-        # fallback if the markers aren’t present
-        cleaned = full_text.strip()
-
+        # Fallback: strip all markers if regex fails
+        cleaned = re.sub(r"### (Instruction|Response):", "", full_text, flags=re.IGNORECASE).strip()
+    
     # 4) Overwrite only the text field
     llm_out["text"] = cleaned
     
