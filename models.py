@@ -85,18 +85,24 @@ def llm_adapter(state: AppState) -> AppState:
     # 2) Call the agent
     llm_out = llm_agent.run(prompt)
 
-    # 3) Immediately dump what came back
-    print(f"[llm_adapter] 🔍 Raw LLMAgent.run output: {llm_out!r}\n")
+    # 3) Extract only the first response block
+    full_text = llm_out["text"]
+    # split off the first Response:
+    if "### Response:" in full_text:
+        # take everything after the first ### Response:
+        resp_block = full_text.split("### Response:", 1)[1]
+        # if there’s a second instruction marker, cut it off there
+        if "### Instruction:" in resp_block:
+            resp_block = resp_block.split("### Instruction:")[0]
+        cleaned = resp_block.strip()
+    else:
+        # fallback if the markers aren’t present
+        cleaned = full_text.strip()
 
-    # 4) (Optional) strip out the instruction header if you’re using a template
-    text = llm_out["text"]
-    marker = "### Response:"
-    if marker in text:
-        text = text.split(marker, 1)[1].lstrip("\n ")
-        llm_out["text"] = text
-
+    # 4) Overwrite only the text field
+    llm_out["text"] = cleaned
+    
     return llm_out
-
 
 # def llm_adapter(state: AppState) -> AppState:
 #     prompt = state.get("text")
